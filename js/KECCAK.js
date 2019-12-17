@@ -47,16 +47,15 @@ const configs = {
 
 /**
  *  state generator.
- * @param level {int} the config level
+ * @param {config} config
  * @param message {boolean[]} the message block being hashed.
  * @returns {State} a variable for tracking state.
  */
-function initState(level, message){
-    let config = configs[level];
-    if(message.length != config[0]) throw "Message is an invalid length.";
+function initState(config = configs[6], message = blankS(config)){
+    if(message.length !== config.b) throw "Message is an invalid length.";
     return {
         config: config,
-        rounds:  21 + 2*config[2],
+        rounds:  12 + 2*config.l,
         round: 0,
         A: new StateArray(config, message)
     };
@@ -105,7 +104,7 @@ function theta(state) {
     for (let x = 0; x < 5; x++) {
         c[x] = new Array(5);
         for (let z = 0; z < config.w; z++) {
-            c[x][z] = A.getBit(x, 0, z) ^ A.getBit(x, 1, z) ^ A.getBit(x, 2, z) ^ A.getBit(x, 3, z) ^ A.getBit(x, 4, z);
+            c[x][z] = xor(xor(xor(xor(A.getBit(x, 0, z), A.getBit(x, 1, z)), A.getBit(x, 2, z)), A.getBit(x, 3, z)), A.getBit(x, 4, z));
         }
     }
 
@@ -114,7 +113,7 @@ function theta(state) {
     for (let x = 0; x < 5; x++) {
         d[x] = new Array(5);
         for (let z = 0; z < config.w; z++) {
-            d[x][z] = c[mod(x - 1, 5)][z] ^ c[mod(x + 1, 5)][mod(z - 1, w)];
+            d[x][z] = xor(c[mod(x - 1, 5)][z], c[mod(x + 1, 5)][mod(z - 1, config.w)]);
         }
     }
 
@@ -183,6 +182,10 @@ function pi(state){
     return _state;
 }
 
+function xor(a,b){
+    return (a || b) && !(a && b);
+}
+
 /**
  * Inplements the χ mapping
  * @param {State} state
@@ -195,7 +198,8 @@ function chi(state){
     for (let x = 0; x<5; x++){
         for (let y = 0; y<5; y++){
             for (let z = 0; z<config.w; z++){
-                let bit = A.getBit(x,y,z) ^ ((A.getBit(mod(x+1,5),y,z) ^ true) && A.getBit(mod(x+2,5),y,z));
+                let bit = xor(A.getBit(x,y,z), (xor(A.getBit(mod(x+1,5),y,z), true) && A.getBit(mod(x+2,5),y,z)));
+                //console.log(bit);
                 _A.setBit(x,y,z,bit);
             }
         }
@@ -215,10 +219,10 @@ function rc(t){
     let R = [true,false,false,false,false,false,false,false];
     for(let i = 0; i<=t; i++){
         R = [false].concat(R);
-        R[0] = R[0] ^ R[8];
-        R[4] = R[4] ^ R[8];
-        R[5] = R[5] ^ R[8];
-        R[6] = R[6] ^ R[8];
+        R[0] = xor(R[0], R[8]);
+        R[4] = xor(R[4], R[8]);
+        R[5] = xor(R[5], R[8]);
+        R[6] = xor(R[6], R[8]);
         R = R.slice(0,8);
     }
     return R[0];
@@ -247,13 +251,68 @@ function iota(state){
     for(let j =0; j<= config.l; j++){
         RC[Math.pow(2,j) - 1] = rc(j + (7 * roundIndex));
     }
-    for(let z = 0; z < configw; z++){
-        let bit = _A.getBit(0,0,z) ^ RC[z];
+    for(let z = 0; z < config.w; z++){
+        let bit = xor(_A.getBit(0,0,z), RC[z]);
         _A.setBit(0,0,z, bit)
     }
     let _state = cloneState(state);
     _state.A = _A;
     return _state;
+}
+
+/**
+ * completes one round of mapping.
+ * @param {State} state
+ * @returns {State} _state
+ */
+function rnd(state){
+    const endstate = iota(chi(pi(rho(theta(state)))));
+    return cloneState(endstate);
+}
+
+/**
+ *
+ */
+class keccak_P{
+    constructor(config = configs[6], message = blankS(config)) {
+        /** @type {State} */
+        this.state = initState(config, message);
+        this.breakRound = this.state.rounds;
+    }
+
+    /**
+     * checks if the rounds are done.
+     * @returns {boolean}
+     */
+    roundsDone(){
+        return this.state.round >= this.state.rounds
+    }
+
+    step(){
+        if(!this.roundsDone()) {
+            let _state = rnd(this.state);
+            _state.round = this.state.round + 1;
+            this.state = _state;
+        }
+    }
+
+    setBreak(brek){
+        this.breakRound = brek;
+    }
+
+    atBreak(){
+        return this.state.round === this.breakRound;
+    }
+
+    continue(){
+        while(!(this.roundsDone() || this.atBreak())){
+            this.step();
+        }
+    }
+
+    getResult(){
+            return this.state.A.getStateString();
+    }
 }
 
 
@@ -265,17 +324,14 @@ class StateArray{
     /**
      * constructor for the state array.
      * @constructor
-     * @param config the config as defined in configs
+     * @param {config} config the config as defined in configs
      * @param S {boolean[]} message string.
      */
-    constructor(config, S){
+    constructor(config = configs[6], S = blankS(config)){
         this.w = config.w;
         this.b = config.b;
-        if(message.length == config.b) throw "message string is an invalid size.";
-        /**
-         *
-         * @type {boolean[]}
-         */
+        if(S.length !== config.b) throw "message string is an invalid size.";
+        /** @type {boolean[]}*/
         this.A = S //new Array(this.b).fill(0);
 
     }
@@ -312,7 +368,7 @@ class StateArray{
      * @param {int} y 0<x<5
      * @returns {*[]} - An array of the lane bits, length w.
      */
-    stringLane(x,y){
+    getStringLane(x,y){
         this.rangeCheck(x,y,0);
         let offset = this.w*(5*y+x);
         return this.A.slice(offset,offset+this.w)
@@ -323,7 +379,7 @@ class StateArray{
      * @param y {int} range 0<y<5
      * @returns {boolean[]}
      */
-    stringPlane(y){
+    getStringPlane(y){
         this.rangeCheck(0,y,0);
         let start = this.w * 5 * y;
         return this.A.slice(start, start+(5*this.w));
@@ -334,7 +390,7 @@ class StateArray{
      * @returns {boolean[]} the state array of length b
      */
     getStateString(){
-        return this.A;
+        return this.A.slice(0);
     }
 
     /**
@@ -342,7 +398,7 @@ class StateArray{
      * @param array {boolean[]} the state array of length b
      */
     setStateArray(array){
-        this.A = array;
+        this.A = array.slice(0);
     }
 
     /**
@@ -358,5 +414,11 @@ class StateArray{
         if(z>this.w || z<0) throw "z value exceeds valid range.";
     }
 }
+
+
+
+test = new keccak_P();
+test.continue();
+console.log(test.getResult());
 
 
