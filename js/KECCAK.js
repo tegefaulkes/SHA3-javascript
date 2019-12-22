@@ -1,4 +1,9 @@
 
+
+
+//TODO: verify that the keccak_P and maping functions are all functioning as intended.
+//TODO: test sponge implementation.
+
 const _DEBUG = true;
 
 
@@ -70,14 +75,32 @@ function cloneState(state){
 }
 
 
-    //utils functions.
-    function mod(m, n) {
-        if (m >= 0) {
-            return m % n;
-        } else {
+//utils functions.
+function mod(m, n) {
+    if (m >= 0) {
+        return m % n;
+    } else {
             return n - (Math.abs(m) % n)
         }
+}
+
+/**
+ *
+ * @param {boolean[]} S message array.
+ * @returns {string} message in binary.
+ */
+function sToHex(S){
+    let _S = [...S.map((x) => String(false+x))];
+    let subArray = _S.slice(0,4);
+    let newArray = [];
+    let x = 0;
+    while(subArray .length !== 0){
+        newArray.push(subArray.join(''));
+        x++;
+        subArray = _S.slice(x*4,x*4+4);
     }
+    return newArray.map((x) => parseInt(x,2).toString(16)).join('').toUpperCase();
+}
 
 /**
  *
@@ -85,7 +108,7 @@ function cloneState(state){
  * @param {boolean} fill - fill array with true or false
  * @returns {boolean[]} sArray
  */
-function blankS(config, fill = false){
+function blankS(config = configs[6], fill = false){
     return new Array(config.b).fill(fill);
     }
 
@@ -187,6 +210,22 @@ function xor(a,b){
 }
 
 /**
+ *
+ * @param {boolean[]} A
+ * @param {boolean[]} B
+ * @returns {boolean[]} A XOR B
+ */
+function xOrStrings(A,B){
+    console.log(A.length, B.length);
+    if( A.length !== B.length) throw "Lengths do not match.";
+    let C = new Array(A.length).fill(false);
+    for (let i = 0; i<A.length; i++){
+        C[i] = xor(A[i],B[i]);
+    }
+    return C;
+}
+
+/**
  * Inplements the χ mapping
  * @param {State} state
  * @returns {State} _state
@@ -273,7 +312,7 @@ function rnd(state){
 /**
  *
  */
-class keccak_P{
+class keccak_P_stepped{
     constructor(config = configs[6], message = blankS(config)) {
         /** @type {State} */
         this.state = initState(config, message);
@@ -313,6 +352,12 @@ class keccak_P{
     getResult(){
             return this.state.A.getStateString();
     }
+}
+
+function keccakP(config = config[6], message = blankS(config)){
+    let kek = new keccak_P_stepped(config, message);
+    kek.continue();
+    return kek.getResult();
 }
 
 
@@ -417,8 +462,95 @@ class StateArray{
 
 
 
-test = new keccak_P();
-test.continue();
-console.log(test.getResult());
+//sponge construction.
+
+/**
+ * returns the padding array.
+ * @param {int} x
+ * @param {int} m
+ * @returns {boolean[]}
+ */
+function pad(x, m){
+    let j = mod(-m - 2, x);
+    return [true].concat(new Array(j).fill(false),[true]);
+}
+
+function placeholderF(x){return x}
+
+/**
+ * @param {config} config
+ * @param {boolean[]} N message array.
+ * @param {int} d ?
+ * @param {int} r ?
+ * @returns {boolean[]} Z output of length d.
+ */
+function SPONGE(config, N, d, r){ //TODO test this.
+    /**
+     *
+     * @param {int} i index.
+     * @param {boolean[]} P
+     * @param {int} r substring width.
+     * @returns {boolean[]} Pi substring.
+     */
+    function getSubP(i,P,r){
+            return P.slice(i*r, i*r+r);
+    }
+    let b = config.b;
+
+    let P = N.concat(pad(r,N.length));
+    let n = P.length/r;
+    let c = b-r;
+    let S = blankS(config);
+
+    //Absorbing stage.
+    for(let i = 0; i< n; i++){
+        S = keccakP(config, xOrStrings( S,getSubP(i,P,r).concat(new Array(c).fill(false))));
+    }
+
+    console.log("S; ", S);
+    //squeezing stage.
+    let Z = [];
+    while(Z.length <= d){
+        Z = Z.concat(S.slice(0,r));
+        S = keccakP(config,S);
+    }
+    console.log("Z; ",Z);
+    return Z.slice(0, d);
+}
+
+/**
+ *
+ * @param {int} c - Capacity.
+ * @param {boolean[]} N - the message.
+ * @param {int} d
+ * @param {config} config - the config.
+ * @returns {boolean[]} the hashed message.
+ */
+function keccak(c,N,d,config = configs[6]){
+    return SPONGE(config, N, d, config.b - c);
+}
+
+
+function SHA3_224(M){
+    return keccak(448, M.concat([false,true]), 224);
+}
+
+function SHA3_256(M){
+    return keccak(512, M.concat([false,true]), 256)
+}
+
+function SHA3_384(M){
+    return keccak(768, M.concat([false,true]), 384)
+}
+
+function SHA3_512(M){
+    return keccak(1024, M.concat([false,true]), 512)
+}
+
+console.log(sToHex(SHA3_256([false, true, true, false, false, false, false, true])));
+
+
+
+
 
 
