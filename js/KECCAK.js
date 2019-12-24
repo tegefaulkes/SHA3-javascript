@@ -40,6 +40,7 @@ const configs = {
 };
 //rounds = 12+2l
 
+//TODO rename A to state array.
 /**
  * @const
  * @typedef State
@@ -96,6 +97,15 @@ function xOrStrings(A,B){
     return C;
 }
 
+/**
+ *
+ * @param {State} A
+ * @param {State} B
+ */
+function xOrStates(A,B){
+    return initState(A.config,xOrStrings(A.A.A,B.A.A))
+}
+
 function ByteToBitString(string){
 //string = "A69F73CCA23A9AC5C8B567DC185A756E97C982164FE25859E0D1DCC1475C80A615B2123AF1F5F94C11E3E9402C3AC558F500199D95B6D3E301758586281DCD26364BC5B8E78F53B823DDA7F4DE9FAD00E67DB72F9F9FEA0CE3C9FEF15A76ADC585EB2EFD1187FB65F9C9A273315167E314FA68B6A322D407015D502ACDEC8C885C4F7784CED04609BB35154A96484B5625D3417C88607ACDE4C2C99BAE5EDF9EEA2AD0FB55A226189E11D24960433E2B0EE045A473099776DD5DE739DB9BA819D54CB903A7A5D7EE"
     let sets = [];
@@ -122,9 +132,10 @@ function mod(m, n) {
 /**
  *
  * @param {boolean[]} S message array.
+ * @param {int} radix
  * @returns {string} message in binary.
  */
-function sToHex(S){
+function sToRadix(S, radix = 16){
     let _S = [...S.map((x) => String(false+x))];
     let subArray = _S.slice(0,4);
     let newArray = [];
@@ -134,29 +145,12 @@ function sToHex(S){
         x++;
         subArray = _S.slice(x*4,x*4+4);
     }
-    return newArray.map((x) => parseInt(x,2).toString(16)).join('').toUpperCase();
+    return newArray.map((x) => parseInt(x,2).toString(radix)).join('').toUpperCase();
 }
 
-/**
- *
- * @param {boolean[]} S message array.
- * @returns {string} message in binary.
- */
-function sToBin(S){
-    let _S = [...S.map((x) => String(false+x))];
-    let subArray = _S.slice(0,4);
-    let newArray = [];
-    let x = 0;
-    while(subArray .length !== 0){
-        newArray.push(subArray.join(''));
-        x++;
-        subArray = _S.slice(x*4,x*4+4);
-    }
-    return newArray.map((x) => parseInt(x,2).toString(2)).join('').toUpperCase();
-}
 
 function sToHexFormatted(S){
-    let hex = sToHex(S);
+    let hex = sToRadix(S);
     let len = hex.length;
     let outString = "";
     for (let x = 0; x<12; x++){
@@ -172,13 +166,26 @@ function sToHexFormatted(S){
 
 /**
  *
+ * @param {boolean[]} S
+ */
+function printOutputReverseEndian(S){
+    let string = sToRadix(S)
+    let chunks = string.match(/.{1,16}/g);
+    for(let i in chunks){
+        chunks[i] = chunks[i].match(/.{1,2}/g).reverse().join('');
+    }
+    console.log(chunks.join(' '));
+}
+
+/**
+ *
  * @param {StateArray} S
  */
 function sPrintLanes(S){
     let outString = "";
     for (let y = 0; y< 5; y++){
         for (let x = 0; x<5; x++){
-            outString += `[${x}, ${y}] = ${sToHex(S.A.getStringLane(x,y)).split("0").join("-")} \n`;
+            outString += `[${x}, ${y}] = ${sToRadix(S.A.getStringLane(x,y)).split("0").join("-")} \n`;
         }
     }
 
@@ -244,13 +251,13 @@ function theta(state) {
         c[x] = new Array(config.w);
         for (let z = 0; z < config.w; z++) {
             c[x][z] = xor(xor(xor(xor(A.getBit(x, 0, z), A.getBit(x, 1, z)), A.getBit(x, 2, z)), A.getBit(x, 3, z)), A.getBit(x, 4, z));
-            if(c[x][z])console.log(`C[${x},${z}] parity of ${c[x][z]};`,A.getBit(x,0,z),A.getBit(x,1,z),A.getBit(x,2,z),A.getBit(x,3,z),A.getBit(x,4,z));
-            //c[x][z]? console.log(`C[${x},${z}]`):"";
+            // if(c[x][z])console.log(`C[${x},${z}] parity of ${c[x][z]};`,A.getBit(x,0,z),A.getBit(x,1,z),A.getBit(x,2,z),A.getBit(x,3,z),A.getBit(x,4,z));
+            // //c[x][z]? console.log(`C[${x},${z}]`):"";
         }
     }
     //console.log("C",c.flat().flat().map((x) => x^0).join(''));
-    console.log(`c[1,1] = ${c[1][1]}`);
-    console.log(`c[3,0] = ${c[3][0]}`);
+    // console.log(`c[1,1] = ${c[1][1]}`);
+    // console.log(`c[3,0] = ${c[3][0]}`);
 
     //step 2
     let d = new Array(5);
@@ -259,7 +266,7 @@ function theta(state) {
         for (let z = 0; z < config.w; z++) {
             //console.log(mod(x - 1, 5),z,":",mod(x + 1, 5),mod(z - 1, config.w) );
             d[x][z] = xor(c[mod(x - 1, 5)][z], c[mod(x + 1, 5)][mod(z + 1, config.w)]);
-            (x === 2 && z ===1)? console.log("checking",c[mod(x - 1, 5)][z],c[mod(x + 1, 5)][mod(z - 1, config.w)],mod(x + 1, 5),mod(z - 1, config.w)):"";
+            // (x === 2 && z ===1)? console.log("checking",c[mod(x - 1, 5)][z],c[mod(x + 1, 5)][mod(z - 1, config.w)],mod(x + 1, 5),mod(z - 1, config.w)):"";
         }
     }
     //console.log("d",d.flat().flat().map((x) => x^0).join(''));
@@ -426,9 +433,13 @@ function rnd(state){
 
 
 class keccak_P_stepped{
-    constructor(config = configs[6], message = blankS(config)) {
+    /**
+     *
+     * @param {state} state
+     */
+    constructor(state) {
         /** @type {State} */
-        this.state = initState(config, message);
+        this.state = state;
         this.breakRound = this.state.rounds;
     }
 
@@ -448,10 +459,18 @@ class keccak_P_stepped{
         }
     }
 
+    /**
+     *
+     * @param {int} brek
+     */
     setBreak(brek){
         this.breakRound = brek;
     }
 
+    /**
+     *
+     * @returns {boolean}
+     */
     atBreak(){
         return this.state.round === this.breakRound;
     }
@@ -462,17 +481,20 @@ class keccak_P_stepped{
         }
     }
 
+    /**
+     *
+     * @returns {State}
+     */
     getResult(){
-            return this.state.A.getStateString();
+            return this.state
     }
-}
+} //WORKING
 
-function keccakP(config = config[6], message = blankS(config)){
-    let kek = new keccak_P_stepped(config, message);
+function keccakP(state){
+    let kek = new keccak_P_stepped(state);
     kek.continue();
     return kek.getResult();
-}
-
+} //WORKING
 
 /**
  * stores the state array and utility functions.
@@ -587,47 +609,157 @@ function pad(x, m){
     return [true].concat(new Array(j).fill(false),[true]);
 }
 
+/**
+ *
+ * @param {boolean[]} S
+ * @returns {boolean[]}
+ */
+function reverseLanes(S){
+    let blocks = S.length/64;
+    let Z = [];
+    for (let i = 0; i<blocks; i++){
+        Z.push(S.slice(i*64, (i+1)*64).reverse());
+    }
+    return Z.flat();
+}
+
+
+const Sstage = {
+    Sabsorb:  1,
+    Ssqueeze: 2,
+    Sdone:    3
+};
+
+class SPONGE_stepped{
+
+    /**
+     * @param {config} config
+     * @param {boolean[]} N message array.
+     * @param {int} d ?
+     * @param {int} r ?
+     * @returns {boolean[]} Z output of length d.
+     * */
+    constructor(N, d, r,config = configs[6]) {
+        this.config = config;
+        this.r = r;
+        this.d = d;
+
+        this.P = N.concat(this.pad101(r,N.length));
+        this.P = reverseLanes(this.P);
+        reverseLanes(this.P);
+        this.n = this.P.length/r;
+        this.c = this.config.b-r;
+        this.S = initState(config, blankS(config));
+        this.stage = Sstage.Sabsorb;
+
+        this.i=0;
+        this.Z = [];
+    }
+
+    step(){
+        switch(this.stage){
+            case Sstage.Sabsorb:
+                // sPrintLanes(initState(this.config,(this.getSubP(this.i,this.P,this.r).concat(new Array(this.c).fill(false)))));
+                this.S.A.A = xOrStrings( this.S.A.A,this.getSubP(this.i,this.P,this.r).concat(new Array(this.c).fill(false)));
+                this.S = keccakP(this.S);
+                this.i += 1;
+                if (this.i >= this.n) this.stage = Sstage.Ssqueeze;
+                break;
+
+            case Sstage.Ssqueeze:
+                this.Z = this.Z.concat(this.S.A.A.slice(0,this.r));
+                this.S = keccakP(this.S);
+                if (this.Z.length > this.d) this.stage = Sstage.Sdone;
+                break;
+
+            case Sstage.Sdone:
+                console.log("done");
+                break;
+
+            default:
+                throw "Invalid state for SPONGE_stepped";
+        }
+    }
+
+    isDone(){
+        return this.stage === Sstage.Sdone;
+    }
+
+    continue(){
+        while (!this.isDone()){
+            this.step();
+        }
+    }
+
+    getResult(){
+        return this.Z.slice(0, this.d);
+    }
+
+
+    getSubP(i,P,r){
+        return P.slice(i*r, i*r+r);
+    }
+
+    pad101(x, m){
+        let j = mod(-m - 2, x);
+        return [true].concat(new Array(j).fill(false),[true]);
+    }
+} //WORKING
 
 /**
  * @param {config} config
  * @param {boolean[]} N message array.
- * @param {int} d ?
- * @param {int} r ?
+ * @param {int} d output bit width.
+ * @param {int} r rate
  * @returns {boolean[]} Z output of length d.
  */
-function SPONGE(config, N, d, r){ //TODO test this.
-    /**
-     *
-     * @param {int} i index.
-     * @param {boolean[]} P
-     * @param {int} r substring width.
-     * @returns {boolean[]} Pi substring.
-     */
-    function getSubP(i,P,r){
-            return P.slice(i*r, i*r+r);
-    }
-    let b = config.b;
+function SPONGE(N, d, r,config = configs[6]) {
+    let sponge = new SPONGE_stepped(N, d, r, config);
+    sponge.continue();
+    return sponge.getResult();
+} //WORKING
 
-    let P = N.concat(pad(r,N.length));
-    let n = P.length/r;
-    let c = b-r;
-    let S = blankS(config);
-
-    //Absorbing stage.
-    for(let i = 0; i< n; i++){
-        S = keccakP(config, xOrStrings( S,getSubP(i,P,r).concat(new Array(c).fill(false))));
-    }
-
-    console.log("S; ", S);
-    //squeezing stage.
-    let Z = [];
-    while(Z.length <= d){
-        Z = Z.concat(S.slice(0,r));
-        S = keccakP(config,S);
-    }
-    console.log("Z; ",Z);
-    return Z.slice(0, d);
-}
+// /**
+//  * @param {config} config
+//  * @param {boolean[]} N message array.
+//  * @param {int} d ?
+//  * @param {int} r ?
+//  * @returns {boolean[]} Z output of length d.
+//  */
+// function SPONGE(N, d, r,config = configs[6]){ //TODO test this.
+//     /**
+//      *
+//      * @param {int} i index.
+//      * @param {boolean[]} P
+//      * @param {int} r substring width.
+//      * @returns {boolean[]} Pi substring.
+//      */
+//     function getSubP(i,P,r){
+//             return P.slice(i*r, i*r+r);
+//     }
+//     let b = config.b;
+//
+//     let P = N.concat(pad101(r,N.length));
+//     let n = P.length/r;
+//     let c = b-r;
+//     let S = initState(config, blankS(config));
+//
+//     //Absorbing stage.
+//     for(let i = 0; i< n; i++){
+//         S.A.A = xOrStrings( S.A.A,getSubP(i,P,r).concat(new Array(c).fill(false)));
+//         S = keccakP(S);
+//     }
+//
+//     console.log("S; ", S);
+//     //squeezing stage.
+//     let Z = [];
+//     while(Z.length <= d){
+//         Z = Z.concat(S.A.A.slice(0,r));
+//         S = keccakP(S);
+//     }
+//     console.log("Z; ",Z);
+//     return Z.slice(0, d);
+// }
 
 /**
  *
@@ -638,25 +770,25 @@ function SPONGE(config, N, d, r){ //TODO test this.
  * @returns {boolean[]} the hashed message.
  */
 function keccak(c,N,d,config = configs[6]){
-    return SPONGE(config, N, d, config.b - c);
+    return SPONGE(N, d, config.b - c);
 }
 
 
 function SHA3_224(M){
     return keccak(448, M.concat([false,true]), 224);
-}
+} //not working, last chunk is wrong.
 
 function SHA3_256(M){
     return keccak(512, M.concat([false,true]), 256)
-}
+} //WORKING
 
 function SHA3_384(M){
     return keccak(768, M.concat([false,true]), 384)
-}
+} //WORKING
 
 function SHA3_512(M){
     return keccak(1024, M.concat([false,true]), 512)
-}
+} //WORKING
 
 //testing.
 /**
@@ -730,7 +862,28 @@ function bitDifference(A, B){
 // sPrintLanes(bitDifference(state, endstate));
 
 //full round test.
-state = stateFromString("0600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-state = rnd(state);
-endstate = stateFromString("0700000000080000000000000060000000200300000800000600000000000000002003000060000000000000000000000000C80000C0000000000000000000200000000000C000000000C800000000200C00000000000000C00C00000000000000000000000000008C0C00000000000040000000000000000018006400000000008000000000000000180000000000000080006400000000000000000000000000000000400600400000000000004000180000004006000000000000000000401800000000004000");
-sPrintLanes(bitDifference(state, endstate));
+// state = stateFromString("0600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+// state = rnd(state);
+// endstate = stateFromString("0700000000080000000000000060000000200300000800000600000000000000002003000060000000000000000000000000C80000C0000000000000000000200000000000C000000000C800000000200C00000000000000C00C00000000000000000000000000008C0C00000000000040000000000000000018006400000000008000000000000000180000000000000080006400000000000000000000000000000000400600400000000000004000180000004006000000000000000000401800000000004000");
+// sPrintLanes(bitDifference(state, endstate));
+
+
+//24 round test.
+// state = stateFromString("0600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+// state = keccakP(state);
+// rnd24= stateFromString("A69F73CCA23A9AC5C8B567DC185A756E97C982164FE25859E0D1DCC1475C80A615B2123AF1F5F94C11E3E9402C3AC558F500199D95B6D3E301758586281DCD26364BC5B8E78F53B823DDA7F4DE9FAD00E67DB72F9F9FEA0CE3C9FEF15A76ADC585EB2EFD1187FB65F9C9A273315167E314FA68B6A322D407015D502ACDEC8C885C4F7784CED04609BB35154A96484B5625D3417C88607ACDE4C2C99BAE5EDF9EEA2AD0FB55A226189E11D24960433E2B0EE045A473099776DD5DE739DB9BA819D54CB903A7A5D7EE");
+// sPrintLanes(bitDifference(state, rnd24));
+
+
+printOutputReverseEndian(SHA3_224(hexToS("")));
+console.log("6b4e03423667dbb7 3b6e15454f0eb1ab d4597f9a1b078e3f 5b5a6bc7");
+printOutputReverseEndian(SHA3_256(hexToS("")));
+console.log("a7ffc6f8bf1ed766 51c14756a061d662 f580ff4de43b49fa 82d80a4b80f8434a");
+printOutputReverseEndian(SHA3_384(hexToS("")));
+console.log("0c63a75b845e4f7d 01107d852e4c2485 c51a50aaaa94fc61 995e71bbee983a2a c3713831264adb47 fb6bd1e058d5f004");
+printOutputReverseEndian(SHA3_512(hexToS("")));
+console.log("a69f73cca23a9ac5 c8b567dc185a756e 97c982164fe25859 e0d1dcc1475c80a6 15b2123af1f5f94c 11e3e9402c3ac558 f500199d95b6d3e3 01758586281dcd26");
+
+
+
+
