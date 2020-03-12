@@ -169,7 +169,7 @@ function sToHexFormatted(S){
  * @param {boolean[]} S
  */
 function printOutputReverseEndian(S){
-    let string = sToRadix(S)
+    let string = sToRadix(S);
     let chunks = string.match(/.{1,16}/g);
     for(let i in chunks){
         chunks[i] = chunks[i].match(/.{1,2}/g).reverse().join('');

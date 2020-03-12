@@ -2,9 +2,98 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>sha3</title>
+    <title>sha3 project</title>
+    <style>
+        body { margin: 0;}
+        canvas {width: 100%; height: 100%}
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            display: block;
+            color: aliceblue;
+        }
+    </style>
 </head>
 <body>
-<script src="js/KECCAK.js"></script>
+<!--<script src="js/KECCAK.js"></script>-->
+<script src="js/three.min.js"></script>
+<script type="module">
+    //import * as THREE from './js/three.min.js';
+    //import * as THREE from "./js/three.min.js";
+
+    function colornator(R,G,B){
+        R = R*51;
+        G = G*51;
+        B = B*4;
+        return parseInt(`0x${R.toString(16)}${G.toString(16)}${B.toString(16)}`,16);
+    }
+
+    function initStateRepresentation(scene){
+        var geometry = new THREE.BoxGeometry(1,1,1);
+        var material = new THREE.MeshBasicMaterial({color: 0x888888, transparent: true, opacity: 0.5 });
+        for (let x = 0; x < 5; x++){
+            for (let y = 0; y < 5; y++){
+                for (let z = 0; z < 64; z++){
+                    // material.color.set();
+                    let cube = new THREE.Mesh(geometry, material);
+                    cube.position.set(x, y, z);
+                    cube.material.color.setHex(colornator(x,y,z));
+                    scene.add(cube)
+                }
+            }
+        }
+    }
+
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(100,100,32);
+    camera.lookAt(0,0,32);
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    var light = new THREE.PointLight(0xff0000,1,100);
+    light.position.set(40,40,64);
+    scene.add(light);
+
+
+
+
+    //var cube = new THREE.Mesh(geometry, material);
+    //scene.add( cube );
+
+    // function genPos(x,y,z){
+    //     return {
+    //         x: x,
+    //         y: y,
+    //         z: z
+    //     }
+    // }
+    // const positions = [
+    //     genPos(1,0,0),
+    //     genPos(-1,0,0),
+    //     genPos(0,1,0),
+    //     genPos(0,-1,0),
+    //     genPos(0,0,1),
+    //     genPos(0,0,-1)
+    // ];
+    // for (let i in positions){
+    //     let cube = new THREE.Mesh(geometry, material);
+    //     let p = positions[i];
+    //     cube.position.set(p.x, p.y, p.z);
+    //     scene.add(cube)
+    // }
+
+    initStateRepresentation(scene);
+
+    renderer.render(scene, camera);
+
+
+</script>
 </body>
 </html>
